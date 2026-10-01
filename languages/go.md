@@ -38,7 +38,7 @@
 - `ctx context.Context` is the first parameter, never stored in a struct or an options struct.
 - Required dependencies past the limit go into an options struct; optional ones become functional
   options (`...Option`) on constructors and public APIs.
-- Name two results of the same type; from three results on, return a struct.
+- Name two results of the same type; from three results besides a trailing `error`, return a struct.
 - Accept interfaces, return concrete types.
 
 ## Control flow (core 3)
@@ -72,8 +72,9 @@
 - Write separate `TestX...` functions when cases need different setup or assertions. No
   `shouldError`, `setupMocks` or switch-dispatch fields inside the table.
 - Failure messages: `Foo(%v) = %v, want %v`.
-- Assertions: stdlib `testing` with `cmp.Diff` by default. A repository that already uses testify
-  `require` keeps it; never mix the two in one repository. No `testify/suite`.
+- Assertions: stdlib `testing` by default, with `cmp.Diff` when `go-cmp` is a direct dependency;
+  otherwise ask before adding it. A repository that already uses testify `require` keeps it; never
+  mix the two in one repository. No `testify/suite`.
 - `t.Helper()` in helpers; `t.Cleanup` over `defer` for fixtures.
 
 ## Reuse (core 7)
@@ -81,7 +82,7 @@
 - `slices`, `maps`, `strings.Cut` and `errors.Join` before third-party helpers. A `map[K]struct{}` or
   `map[K]bool` is a fine set for membership checks.
 - Ban superseded packages with `depguard`: `github.com/pkg/errors`, `io/ioutil`,
-  `golang.org/x/exp/slices`.
+  `golang.org/x/exp/slices`, `golang.org/x/exp/maps`.
 
 ## Preferred libraries (core 7)
 
@@ -91,7 +92,7 @@ dependency without asking. The standard library comes first.
 | Need | Standard library | Library, when `go.mod` requires it directly |
 |---|---|---|
 | Search, sort, min/max of slices | `slices`, `cmp` | — |
-| Map keys and values | `slices.Collect(maps.Keys(m))` | `lo.Keys`, `lo.Values` |
+| Map keys and values | `slices.Collect(maps.Keys(m))`, `slices.Collect(maps.Values(m))` | — |
 | Transform, filter, index, group, dedupe | plain loop | `samber/lo`: `Map`, `Filter`, `FilterMap`, `KeyBy`, `GroupBy`, `Uniq` |
 | Split a slice into chunks | `slices.Chunk` (an iterator; wrap in `slices.Collect` for `[][]T`) | — |
 | Pointer to a value | `new(v)` when `go.mod` declares Go 1.26+ | `lo.ToPtr` below Go 1.26 |
@@ -99,7 +100,7 @@ dependency without asking. The standard library comes first.
 | Set membership | `map[K]struct{}` | a set library only for set algebra (union, difference) |
 | Decimal arithmetic (money, rates) | — | `shopspring/decimal` |
 | Concurrent tasks that return errors | — | `golang.org/x/sync/errgroup` |
-| Diffs in tests | — | `google/go-cmp` (`cmp.Diff`), the default |
+| Diffs in tests | — | `google/go-cmp` (`cmp.Diff`) |
 | Assertions in tests | `testing`, the default | `stretchr/testify/require`, only where the repository already uses it |
 | Logging | `log/slog` | — |
 | Errors | `errors`, `fmt.Errorf` with `%w`, `errors.Join` | — |
@@ -108,7 +109,8 @@ With `samber/lo`:
 
 - Use the standard library where it covers the call: `slices.Contains` over `lo.Contains`,
   `slices.Index` over `lo.IndexOf`, `slices.Max`/`slices.Min` over `lo.Max`/`lo.Min`, `slices.Chunk`
-  over `lo.Chunk`, `new(v)` over `lo.ToPtr` on Go 1.26+.
+  over `lo.Chunk`, `slices.Collect(maps.Keys(m))`/`maps.Values` over `lo.Keys`/`lo.Values`, `new(v)`
+  over `lo.ToPtr` on Go 1.26+.
 - `lo.Ternary(cond, a, b)` evaluates both `a` and `b`. Use `if` or `lo.TernaryF` when either side
   has side effects or is costly.
 - `lo.Must` panics: only in initialisation and tests.
@@ -117,7 +119,8 @@ With `samber/lo`:
 ## Boundaries (core 8)
 
 - No mutable package-level state; `init()` does registration only.
-- Log through `log/slog` or the project's logger. No `fmt.Print*` or `log.Print*` outside `main`.
+- Log through `log/slog` or the project's logger. No `fmt.Print*` or `log.Print*` outside `main`
+  packages (files under `cmd/`, or a `main.go`).
 - Use `internal/` for packages the module does not export.
 
 ## Formatting (core 9)
@@ -154,6 +157,8 @@ linters:
               desc: use io and os
             - pkg: golang.org/x/exp/slices
               desc: use slices
+            - pkg: golang.org/x/exp/maps
+              desc: use maps
     forbidigo:
       forbid:
         - pattern: ^(fmt\.Print(|f|ln)|log\.Print(|f|ln)|print|println)$
@@ -170,13 +175,13 @@ linters:
         - name: early-return
   exclusions:
     rules:
-      - path: ^cmd/
+      - path: '(^|/)cmd/|(^|/)main\.go$'
         linters: [forbidigo]
 formatters:
   enable: [gofmt, goimports]
   settings:
     goimports:
-      local-prefixes: [example.com/your/module]
+      local-prefixes: [example.com/your/module] # replace with the module path from go.mod
 ```
 
 Run clone detection by hand during review (core 7.2): `golangci-lint run --enable-only dupl`.
