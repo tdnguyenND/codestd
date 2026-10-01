@@ -1,6 +1,6 @@
 # Go
 
-> Applies to Go 1.22+. Formatter: `gofmt` (or `gofumpt`) with `goimports`. Linter: `golangci-lint` v2.
+> Applies to Go 1.23+. Formatter: `gofmt` (or `gofumpt`) with `goimports`. Linter: `golangci-lint` v2.
 > Read with the [core](../core/conventions.md); IDs like `2.2` refer to it.
 
 ## Thresholds
@@ -15,7 +15,7 @@
 | Function length | ~50 statements, soft | 2.6 |
 | Clone size | 100 tokens | 7.2 |
 | Naked returns | in functions over 30 lines | 2.1 |
-| Line length | soft, ~100–120 | 9.1 |
+| Line length | no fixed limit; break a line only when it reads better | 9.1 |
 | File length | no default; measure the repository | — |
 
 ## Names (core 1)
@@ -31,14 +31,14 @@
 - One-method interfaces take an `-er` name (`Reader`); no `I` prefix.
 - Receivers are one or two letters, the same across all methods of a type, never `this` or `self`.
 - Errors: exported sentinels `ErrNotFound`, unexported `errNotFound`, types `NotFoundError`.
-- Scope bands for 1.2: small 1–7 lines, medium 8–15, large 15–25.
+- Scope bands for 1.2: small 1–7 lines, medium 8–15, large 16–25.
 
 ## Functions (core 2)
 
 - `ctx context.Context` is the first parameter, never stored in a struct or an options struct.
 - Required dependencies past the limit go into an options struct; optional ones become functional
   options (`...Option`) on constructors and public APIs.
-- Name 2–3 results of the same type before reaching for a result struct.
+- Name two results of the same type; from three results besides a trailing `error`, return a struct.
 - Accept interfaces, return concrete types.
 
 ## Control flow (core 3)
@@ -47,7 +47,7 @@
 
 ## Errors (core 4)
 
-- Check every error. `_ = f()` only with a comment saying why it is safe.
+- Check every error. Discard one only as `_ = f() //nolint:errcheck // <why it is safe>`.
 - Wrap with `%w` and the operation: `fmt.Errorf("load pool %s: %w", id, err)`. At RPC and storage
   boundaries, where callers must not depend on the cause, use `%v` or map to a status code.
 - Error strings are lowercase, with no trailing punctuation and no "failed to" prefix.
@@ -72,8 +72,9 @@
 - Write separate `TestX...` functions when cases need different setup or assertions. No
   `shouldError`, `setupMocks` or switch-dispatch fields inside the table.
 - Failure messages: `Foo(%v) = %v, want %v`.
-- One assertion style per repository: stdlib `testing` with `cmp.Diff`, or testify `require`. No
-  `testify/suite`.
+- Assertions: stdlib `testing` by default, with `cmp.Diff` when `go-cmp` is a direct dependency;
+  otherwise ask before adding it. A repository that already uses testify `require` keeps it; never
+  mix the two in one repository. No `testify/suite`.
 - `t.Helper()` in helpers; `t.Cleanup` over `defer` for fixtures.
 
 ## Reuse (core 7)
@@ -81,31 +82,35 @@
 - `slices`, `maps`, `strings.Cut` and `errors.Join` before third-party helpers. A `map[K]struct{}` or
   `map[K]bool` is a fine set for membership checks.
 - Ban superseded packages with `depguard`: `github.com/pkg/errors`, `io/ioutil`,
-  `golang.org/x/exp/slices`.
+  `golang.org/x/exp/slices`, `golang.org/x/exp/maps`.
 
 ## Preferred libraries (core 7)
 
-Use a library only when the module's `go.mod` already requires it. Never add a dependency without
-asking. The standard library comes first.
+Use a library only when the module's `go.mod` requires it directly (not `// indirect`). Never add a
+dependency without asking. The standard library comes first.
 
-| Need | Standard library | Library, when already in `go.mod` |
+| Need | Standard library | Library, when `go.mod` requires it directly |
 |---|---|---|
 | Search, sort, min/max of slices | `slices`, `cmp` | — |
-| Map keys and values | `slices.Collect(maps.Keys(m))` | `lo.Keys`, `lo.Values` |
-| Transform, filter, index, group, dedupe | plain loop | `samber/lo`: `Map`, `Filter`, `FilterMap`, `KeyBy`, `GroupBy`, `Uniq`, `Chunk` |
-| Pointer to a value | — | `lo.ToPtr`, `lo.FromPtr` |
+| Map keys and values | `slices.Collect(maps.Keys(m))`, `slices.Collect(maps.Values(m))` | — |
+| Transform, filter, index, group, dedupe | plain loop | `samber/lo`: `Map`, `Filter`, `FilterMap`, `KeyBy`, `GroupBy`, `Uniq` |
+| Split a slice into chunks | `slices.Chunk` (an iterator; wrap in `slices.Collect` for `[][]T`) | — |
+| Pointer to a value | `new(v)` when `go.mod` declares Go 1.26+ | `lo.ToPtr` below Go 1.26 |
+| Value behind a pointer, or zero | — | `lo.FromPtr` |
 | Set membership | `map[K]struct{}` | a set library only for set algebra (union, difference) |
 | Decimal arithmetic (money, rates) | — | `shopspring/decimal` |
 | Concurrent tasks that return errors | — | `golang.org/x/sync/errgroup` |
 | Diffs in tests | — | `google/go-cmp` (`cmp.Diff`) |
-| Assertions in tests | `testing` | `stretchr/testify/require` |
+| Assertions in tests | `testing`, the default | `stretchr/testify/require`, only where the repository already uses it |
 | Logging | `log/slog` | — |
 | Errors | `errors`, `fmt.Errorf` with `%w`, `errors.Join` | — |
 
 With `samber/lo`:
 
 - Use the standard library where it covers the call: `slices.Contains` over `lo.Contains`,
-  `slices.Index` over `lo.IndexOf`, `slices.Max`/`slices.Min` over `lo.Max`/`lo.Min`.
+  `slices.Index` over `lo.IndexOf`, `slices.Max`/`slices.Min` over `lo.Max`/`lo.Min`, `slices.Chunk`
+  over `lo.Chunk`, `slices.Collect(maps.Keys(m))`/`maps.Values` over `lo.Keys`/`lo.Values`, `new(v)`
+  over `lo.ToPtr` on Go 1.26+.
 - `lo.Ternary(cond, a, b)` evaluates both `a` and `b`. Use `if` or `lo.TernaryF` when either side
   has side effects or is costly.
 - `lo.Must` panics: only in initialisation and tests.
@@ -114,7 +119,8 @@ With `samber/lo`:
 ## Boundaries (core 8)
 
 - No mutable package-level state; `init()` does registration only.
-- Log through `log/slog` or the project's logger. No `fmt.Print*` or `log.Print*` outside `main`.
+- Log through `log/slog` or the project's logger. No `fmt.Print*` or `log.Print*` outside `main`
+  packages (files under `cmd/`, or a `main.go`).
 - Use `internal/` for packages the module does not export.
 
 ## Formatting (core 9)
@@ -128,31 +134,57 @@ With `samber/lo`:
 ```yaml
 version: "2"
 linters:
-  enable: [revive, gocognit, dupl, nakedret, errorlint]
+  enable: [revive, gocognit, nakedret, errorlint, depguard, forbidigo, nolintlint]
   settings:
     errcheck:
-      check-blank: true
+      check-blank: true          # a discarded error needs //nolint:errcheck // <why>
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     gocognit:
       min-complexity: 15
-    dupl:
-      threshold: 100
     nakedret:
       max-func-lines: 30
-    revive:
+    dupl:
+      threshold: 100             # not enabled: run by hand during review
+    depguard:
       rules:
-        - name: argument-limit        # counts ctx: exact when ctx is present, one late otherwise
-          arguments: [5]
+        superseded:
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: use errors and fmt.Errorf with %w
+            - pkg: io/ioutil
+              desc: use io and os
+            - pkg: golang.org/x/exp/slices
+              desc: use slices
+            - pkg: golang.org/x/exp/maps
+              desc: use maps
+    forbidigo:
+      forbid:
+        - pattern: ^(fmt\.Print(|f|ln)|log\.Print(|f|ln)|print|println)$
+          msg: log through log/slog or the project's logger
+    revive:
+      enable-default-rules: true # keep revive's default rules alongside the ones below
+      rules:
+        - name: argument-limit        # counts ctx and a trailing ...Option: exact with one of them,
+          arguments: [5]              # one late with neither, one early with both
         - name: function-result-limit # counts error: exact when the function returns an error
           arguments: [3]
         - name: max-control-nesting
           arguments: [4]
         - name: early-return
-        - name: indent-error-flow
-        - name: superfluous-else
-        - name: error-strings
-        - name: context-as-argument
-        - name: exported
+  exclusions:
+    rules:
+      - path: '(^|/)cmd/|(^|/)main\.go$'
+        linters: [forbidigo]
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [example.com/your/module] # replace with the module path from go.mod
 ```
+
+Run clone detection by hand during review (core 7.2): `golangci-lint run --enable-only dupl`.
 
 ## References
 
