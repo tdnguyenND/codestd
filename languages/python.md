@@ -12,7 +12,7 @@
 | Positional `bool` parameters | any behaviour switch | 2.3 |
 | Tuple returns | ≥ 3 elements | 2.4 |
 | Nesting | > 5 blocks | 3.2 |
-| Boolean operators in one condition | > 5 | 3.3 |
+| Boolean operands in one `if` condition | > 5 | 3.3 |
 | Cyclomatic complexity | measure the repository first; then flag above its measured tail | 2.6 |
 | Function length | ~40 lines or 50 statements, soft | 2.6 |
 | Module length | ~1000 lines, soft | — |
@@ -82,12 +82,13 @@
 
 ## Preferred libraries (core 7)
 
-Use a library only when the project declares it directly: `[project.dependencies]`, a dependency
-group, or a hand-written `requirements.in`. A lock file or a compiled `requirements.txt` also lists
-transitive dependencies and does not count. Never add a dependency without asking. The standard
-library comes first.
+Production code uses a library only when the project declares it as a runtime dependency:
+`[project.dependencies]`, `[tool.poetry.dependencies]`, `install_requires`, or a hand-written
+`requirements.txt`/`requirements.in`. Dependency groups and dev extras serve tests and tooling only.
+A lock file or a compiled `requirements.txt` lists transitive dependencies and does not count. Never
+add a dependency without asking. The standard library comes first.
 
-| Need | Standard library | Library, when declared directly |
+| Need | Standard library | Library, when declared (see above) |
 |---|---|---|
 | Typed settings from env and files | — | `pydantic-settings` |
 | Validating data that crosses a boundary | `dataclasses` for internal data | `pydantic` |
@@ -135,20 +136,17 @@ required-version = ">=0.16"
 line-length = 88
 
 [tool.ruff.lint]
-preview = true
-explicit-preview-rules = true          # enable only the preview rules selected below
 extend-select = [
   "ASYNC210",                          # blocking HTTP call in async code
   "B",                                 # bugbear: B006 mutable defaults, B904 raise ... from
   "BLE",                               # blind except
   "C4",                                # comprehensions
-  "DTZ003",                            # datetime.utcnow()
+  "DTZ",                               # naive datetimes, utcnow()
   "FBT001", "FBT002",                  # positional bool parameters
   "G",                                 # logging format
   "I",                                 # import sorting
   "LOG015",                            # root logger call
   "PLR0913", "PLR0917",                # parameters, positional parameters
-  "PLR0916", "PLR1702",                # boolean operators, nesting (preview)
   "PT",                                # pytest style
   "RET505", "RET506", "RET507", "RET508",  # else after return, raise, continue, break
   "S101", "S110",                      # assert, try-except-pass
@@ -168,8 +166,6 @@ extend-select = [
 [tool.ruff.lint.pylint]
 max-args = 5
 max-positional-args = 5
-max-bool-expr = 5
-max-nested-blocks = 5
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -178,8 +174,11 @@ ban-relative-imports = "all"
 "your_package.legacy_helpers".msg = "use your_package.shared instead"  # replace with real entries
 ```
 
-Complexity: measure the repository's cyclomatic complexity first, then add `"C90"` and set
-`[tool.ruff.lint.mccabe] max-complexity` to its measured tail.
+- Nesting and boolean operands are enforced by pylint R1702 and R0916, both on by default. ruff has
+  them only in preview; do not turn preview on for them. Without pylint they are review signals.
+- In a project without pytest, add `"PT009", "PT027"` to `extend-ignore`.
+- Complexity: measure the repository's cyclomatic complexity first, then add `"C90"` and set
+  `[tool.ruff.lint.mccabe] max-complexity` to its measured tail.
 
 ## References
 
