@@ -1,0 +1,15 @@
+{
+  "name": "codestd",
+  "description": "Coding conventions for AI coding agents: a language-agnostic core plus per-language packs.",
+  "owner": {
+    "name": "tdnguyenND",
+    "url": "https://github.com/tdnguyenND"
+  },
+  "plugins": [
+    {
+      "name": "codestd",
+      "source": "./",
+      "description": "Coding conventions for writing and reviewing code: a language-agnostic core plus packs for Go and Python."
+    }
+  ]
+}
