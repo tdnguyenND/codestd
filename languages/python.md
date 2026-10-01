@@ -84,8 +84,9 @@
 
 Production code uses a library only when the project declares it as a runtime dependency:
 `[project.dependencies]`, `[tool.poetry.dependencies]`, `install_requires`, or a hand-written
-`requirements.txt`/`requirements.in`. Dependency groups and dev extras serve tests and tooling only.
-A lock file or a compiled `requirements.txt` lists transitive dependencies and does not count. Never
+`requirements.txt`/`requirements.in`. A runtime extra in `[project.optional-dependencies]` (such as
+`postgres = ["psycopg"]`) counts for the feature module that requires it. Dependency groups and dev
+or test extras serve tests and tooling only. A lock file or a compiled `requirements.txt` lists transitive dependencies and does not count. Never
 add a dependency without asking. The standard library comes first.
 
 | Need | Standard library | Library, when declared (see above) |
@@ -176,7 +177,9 @@ ban-relative-imports = "all"
 
 - Nesting and boolean operands are enforced by pylint R1702 and R0916, both on by default. ruff has
   them only in preview; do not turn preview on for them. Without pylint they are review signals.
-- In a project without pytest, add `"PT009", "PT027"` to `extend-ignore`.
+- pylint R1702 counts only `if`, `for`, `while` and `try`, and restarts the count at a `with`.
+  Count `with` blocks toward the nesting limit in review.
+- In a project without pytest, add `"PT009", "PT027"` to `[tool.ruff.lint] ignore`.
 - Complexity: measure the repository's cyclomatic complexity first, then add `"C90"` and set
   `[tool.ruff.lint.mccabe] max-complexity` to its measured tail.
 
