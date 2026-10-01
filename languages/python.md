@@ -72,6 +72,32 @@
 - Comprehensions and built-ins over manual loops.
 - Point callers at shared helpers with ruff `TID251` banned-api.
 
+## Preferred libraries (core 7)
+
+Use a library only when the project already declares it (`pyproject.toml`, `requirements*.txt`).
+Never add a dependency without asking. The standard library comes first.
+
+| Need | Standard library | Library, when already a dependency |
+|---|---|---|
+| Typed settings from env and files | — | `pydantic-settings` |
+| Validating data that crosses a boundary | `dataclasses` for internal data | `pydantic` |
+| Chunk, chain, group, count | `itertools` (`batched` on 3.12+), `collections` | `more-itertools` |
+| Ordered dedupe | `list(dict.fromkeys(items))` | `more_itertools.unique_everseen` for unhashable items or a key |
+| Decimal arithmetic (money, rates) | `decimal.Decimal` | — |
+| Dates and time zones | `datetime` with `zoneinfo` | — |
+| Paths | `pathlib` | — |
+| HTTP client | — | `httpx`; `requests` only in sync code |
+| Retries with backoff | — | `tenacity` |
+| Async task groups | `asyncio.TaskGroup` (3.11+) | `anyio` |
+| Tests and test doubles | `unittest.mock` | `pytest` |
+| Fixed time in tests | an injected clock | `time-machine` or `freezegun` |
+| Logging | `logging` | `structlog` |
+| JSON | `json` | `orjson` on a measured hot path |
+
+- Aware datetimes only: `datetime.now(timezone.utc)`, never `datetime.utcnow()`.
+- Never call `requests` from `async` code; use `httpx.AsyncClient`.
+- Retry only idempotent operations, and always set both a stop and a wait on `tenacity.retry`.
+
 ## Boundaries (core 8)
 
 - Settings: a `pydantic-settings` `BaseSettings` subclass, nested models with
@@ -128,6 +154,7 @@ max-complexity = 10
 
 - [PEP 8](https://peps.python.org/pep-0008/), [PEP 257](https://peps.python.org/pep-0257/), [Logging HOWTO](https://docs.python.org/3/howto/logging.html)
 - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
+- [pydantic](https://github.com/pydantic/pydantic), [more-itertools](https://github.com/more-itertools/more-itertools), [httpx](https://github.com/encode/httpx), [requests](https://github.com/psf/requests), [tenacity](https://github.com/jd/tenacity), [anyio](https://github.com/agronholm/anyio), [time-machine](https://github.com/adamchainz/time-machine), [freezegun](https://github.com/spulec/freezegun), [structlog](https://github.com/hynek/structlog), [orjson](https://github.com/ijl/orjson)
 - [ruff](https://github.com/astral-sh/ruff), [pylint](https://github.com/pylint-dev/pylint), [wemake-python-styleguide](https://github.com/wemake-services/wemake-python-styleguide), [pytest](https://docs.pytest.org/)
 - [FastAPI settings guide](https://fastapi.tiangolo.com/advanced/settings/), [pydantic-settings](https://github.com/pydantic/pydantic-settings), [Django coding style](https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/)
 - Project configs and contributor guides: [Home Assistant](https://github.com/home-assistant/core), [pandas](https://github.com/pandas-dev/pandas), [scikit-learn](https://github.com/scikit-learn/scikit-learn), [Apache Airflow](https://github.com/apache/airflow), [pydantic](https://github.com/pydantic/pydantic), [polars](https://github.com/pola-rs/polars), [LangChain](https://github.com/langchain-ai/langchain), [pip](https://github.com/pypa/pip)
