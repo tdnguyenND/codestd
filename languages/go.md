@@ -83,6 +83,34 @@
 - Ban superseded packages with `depguard`: `github.com/pkg/errors`, `io/ioutil`,
   `golang.org/x/exp/slices`.
 
+## Preferred libraries (core 7)
+
+Use a library only when the module's `go.mod` already requires it. Never add a dependency without
+asking. The standard library comes first.
+
+| Need | Standard library | Library, when already in `go.mod` |
+|---|---|---|
+| Search, sort, min/max of slices | `slices`, `cmp` | — |
+| Map keys and values | `slices.Collect(maps.Keys(m))` | `lo.Keys`, `lo.Values` |
+| Transform, filter, index, group, dedupe | plain loop | `samber/lo`: `Map`, `Filter`, `FilterMap`, `KeyBy`, `GroupBy`, `Uniq`, `Chunk` |
+| Pointer to a value | — | `lo.ToPtr`, `lo.FromPtr` |
+| Set membership | `map[K]struct{}` | a set library only for set algebra (union, difference) |
+| Decimal arithmetic (money, rates) | — | `shopspring/decimal` |
+| Concurrent tasks that return errors | — | `golang.org/x/sync/errgroup` |
+| Diffs in tests | — | `google/go-cmp` (`cmp.Diff`) |
+| Assertions in tests | `testing` | `stretchr/testify/require` |
+| Logging | `log/slog` | — |
+| Errors | `errors`, `fmt.Errorf` with `%w`, `errors.Join` | — |
+
+With `samber/lo`:
+
+- Use the standard library where it covers the call: `slices.Contains` over `lo.Contains`,
+  `slices.Index` over `lo.IndexOf`, `slices.Max`/`slices.Min` over `lo.Max`/`lo.Min`.
+- `lo.Ternary(cond, a, b)` evaluates both `a` and `b`. Use `if` or `lo.TernaryF` when either side
+  has side effects or is costly.
+- `lo.Must` panics: only in initialisation and tests.
+- Write the loop when the callback would be longer than the loop itself.
+
 ## Boundaries (core 8)
 
 - No mutable package-level state; `init()` does registration only.
@@ -131,5 +159,6 @@ linters:
 - [Effective Go](https://go.dev/doc/effective_go), [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments), [Go Doc Comments](https://go.dev/doc/comment), [Table-driven tests](https://go.dev/wiki/TableDrivenTests), [Organizing a Go module](https://go.dev/doc/modules/layout)
 - [Google Go Style Guide](https://google.github.io/styleguide/go/)
 - [Uber Go Style Guide](https://github.com/uber-go/guide)
+- [samber/lo](https://github.com/samber/lo), [shopspring/decimal](https://github.com/shopspring/decimal), [go-cmp](https://github.com/google/go-cmp), [testify](https://github.com/stretchr/testify), [x/sync](https://pkg.go.dev/golang.org/x/sync/errgroup)
 - [golangci-lint](https://github.com/golangci/golangci-lint), [revive](https://github.com/mgechev/revive), [staticcheck](https://github.com/dominikh/go-tools), [funlen](https://github.com/ultraware/funlen), [dupl](https://github.com/mibk/dupl), [gocognit](https://github.com/uudashr/gocognit), [sonar-go](https://github.com/SonarSource/sonar-go)
 - Project configs and style docs: [Kubernetes](https://github.com/kubernetes/community/blob/main/contributors/guide/coding-conventions.md), [Prometheus](https://github.com/prometheus/prometheus), [etcd](https://github.com/etcd-io/etcd), [Moby](https://github.com/moby/moby), [Grafana](https://github.com/grafana/grafana/blob/main/contribute/backend/style-guide.md), [CockroachDB](https://github.com/cockroachdb/cockroach/blob/master/docs/style.md)
