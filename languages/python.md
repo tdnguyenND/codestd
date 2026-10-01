@@ -86,8 +86,9 @@ Production code uses a library only when the project declares it as a runtime de
 `[project.dependencies]`, `[tool.poetry.dependencies]`, `install_requires`, or a hand-written
 `requirements.txt`/`requirements.in`. A runtime extra in `[project.optional-dependencies]` (such as
 `postgres = ["psycopg"]`) counts for the feature module that requires it. Dependency groups and dev
-or test extras serve tests and tooling only. A lock file or a compiled `requirements.txt` lists transitive dependencies and does not count. Never
-add a dependency without asking. The standard library comes first.
+or test extras serve tests and tooling only. A lock file or a compiled `requirements.txt` lists
+transitive dependencies and does not count. Never add a dependency without asking. The standard
+library comes first.
 
 | Need | Standard library | Library, when declared (see above) |
 |---|---|---|
