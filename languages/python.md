@@ -12,7 +12,8 @@
 | Positional `bool` parameters | any behaviour switch | 2.3 |
 | Tuple returns | ≥ 3 elements | 2.4 |
 | Nesting | > 5 blocks | 3.2 |
-| Cyclomatic complexity | > 10, as a suggestion; measure the repository | 2.6 |
+| Boolean operators in one condition | > 5 | 3.3 |
+| Cyclomatic complexity | measure the repository first; then flag above its measured tail | 2.6 |
 | Function length | ~40 lines or 50 statements, soft | 2.6 |
 | Module length | ~1000 lines, soft | — |
 | Line length | 88, owned by the formatter | 9.1 |
@@ -27,7 +28,8 @@
 - Leave the type out of the name: `id_to_name`, not `id_to_name_dict`.
 - Expose a plain attribute or a `@property` instead of trivial `get_x()`/`set_x()` pairs; keep
   methods for costly or state-changing operations.
-- Exception classes subclass a built-in exception and end in `Error`.
+- Exception classes subclass `Exception` (or one of its subclasses), never `BaseException`, and end
+  in `Error`.
 - A single leading underscore marks module or class internals.
 
 ## Functions (core 2)
@@ -52,32 +54,40 @@
 
 ## Comments (core 5)
 
-- Public modules, classes and functions have docstrings. A docstring that only restates the signature
-  is rewritten with the contract: what it returns, what it raises, side effects, units (5.2).
-- Where the project's pydocstyle `D1` rules are off, echo docstrings are deleted instead.
+- Public modules, classes and functions have docstrings. On public API, a docstring that only
+  restates the signature is rewritten with the contract: what it returns, what it raises, side
+  effects, units (5.2).
+- Echo docstrings on non-public code are deleted.
 - Type hints document parameter types; describe a parameter only when its meaning is not obvious.
 - TODOs link an issue: `# TODO: https://github.com/org/repo/issues/123 - drop after v2 migration`.
 
 ## Tests (core 6)
 
+- Tests run on pytest. If the project does not declare pytest, ask before adding it; until then
+  apply the same rules with `unittest` (`subTest` for cases, `assertRaises` for errors).
 - One test function per behaviour, named `test_<unit>_<behaviour>`.
-- Use `pytest.mark.parametrize` only when the bodies are identical, and name each case with
-  `pytest.param(..., id="rejects_negative_amount")`.
+- Merge cases into one `pytest.mark.parametrize` test only when the separate tests would have
+  identical bodies, and name each case with `pytest.param(..., id="rejects_negative_amount")`.
+- No `if` on a parametrized argument inside the test body (`if should_fail: ...`); split those cases
+  into separate tests.
 - Plain `assert`; `pytest.raises(SpecificError, match=...)`.
 - No `datetime.now()` or global randomness in tests: use fixed times, an injected clock and an
   explicit seed.
 
 ## Reuse (core 7)
 
-- Comprehensions and built-ins over manual loops.
+- Comprehensions and built-ins over manual loops, unless the loop is clearer (side effects, several
+  branches).
 - Point callers at shared helpers with ruff `TID251` banned-api.
 
 ## Preferred libraries (core 7)
 
-Use a library only when the project already declares it (`pyproject.toml`, `requirements*.txt`).
-Never add a dependency without asking. The standard library comes first.
+Use a library only when the project declares it directly: `[project.dependencies]`, a dependency
+group, or a hand-written `requirements.in`. A lock file or a compiled `requirements.txt` also lists
+transitive dependencies and does not count. Never add a dependency without asking. The standard
+library comes first.
 
-| Need | Standard library | Library, when already a dependency |
+| Need | Standard library | Library, when declared directly |
 |---|---|---|
 | Typed settings from env and files | — | `pydantic-settings` |
 | Validating data that crosses a boundary | `dataclasses` for internal data | `pydantic` |
@@ -89,14 +99,16 @@ Never add a dependency without asking. The standard library comes first.
 | HTTP client | — | `httpx`; `requests` only in sync code |
 | Retries with backoff | — | `tenacity` |
 | Async task groups | `asyncio.TaskGroup` (3.11+) | `anyio` |
-| Tests and test doubles | `unittest.mock` | `pytest` |
+| Test runner | `unittest` | `pytest`, the default |
+| Test doubles | `unittest.mock` | `pytest-mock` where the project already uses it |
 | Fixed time in tests | an injected clock | `time-machine` or `freezegun` |
 | Logging | `logging` | `structlog` |
 | JSON | `json` | `orjson` on a measured hot path |
 
 - Aware datetimes only: `datetime.now(timezone.utc)`, never `datetime.utcnow()`.
 - Never call `requests` from `async` code; use `httpx.AsyncClient`.
-- Retry only idempotent operations, and always set both a stop and a wait on `tenacity.retry`.
+- Retry only idempotent operations. Always pass `stop`, `wait`,
+  `retry=retry_if_exception_type((<transient errors>))` and `reraise=True` to `tenacity.retry`.
 
 ## Boundaries (core 8)
 
@@ -107,7 +119,7 @@ Never add a dependency without asking. The standard library comes first.
   libraries add only a `NullHandler`.
 - Pass log arguments instead of formatting them: `logger.info("loaded %s", pool_id)`, not an
   f-string.
-- No `print` outside `__main__.py` and scripts.
+- No `print` outside `__main__.py`, the project's CLI module and scripts.
 
 ## Formatting (core 9)
 
@@ -119,36 +131,55 @@ Never add a dependency without asking. The standard library comes first.
 
 ```toml
 [tool.ruff]
+required-version = ">=0.16"
 line-length = 88
 
 [tool.ruff.lint]
+preview = true
+explicit-preview-rules = true          # enable only the preview rules selected below
 extend-select = [
-  "B",                 # bugbear: B006 mutable defaults, B904 raise ... from
-  "BLE",               # blind except
-  "C4",                # comprehensions
-  "C90",               # mccabe complexity
-  "FBT001", "FBT002",  # positional bool parameters
-  "G",                 # logging format
-  "I",                 # import sorting
-  "PLR0913", "PLR0917",
-  "PT",                # pytest style
-  "RET",               # else after return
-  "S101", "S110",      # assert, try-except-pass
+  "ASYNC210",                          # blocking HTTP call in async code
+  "B",                                 # bugbear: B006 mutable defaults, B904 raise ... from
+  "BLE",                               # blind except
+  "C4",                                # comprehensions
+  "DTZ003",                            # datetime.utcnow()
+  "FBT001", "FBT002",                  # positional bool parameters
+  "G",                                 # logging format
+  "I",                                 # import sorting
+  "LOG015",                            # root logger call
+  "PLR0913", "PLR0917",                # parameters, positional parameters
+  "PLR0916", "PLR1702",                # boolean operators, nesting (preview)
+  "PT",                                # pytest style
+  "RET505", "RET506", "RET507", "RET508",  # else after return, raise, continue, break
+  "S101", "S110",                      # assert, try-except-pass
   "SIM",
-  "T20",               # print
+  "T20",                               # print
+  "TID",                               # relative imports, banned APIs
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "FBT", "PLR0913"]
-"scripts/**" = ["T20"]
+"**/tests/**" = ["S101", "FBT", "PLR0913", "PLR0917"]
+"**/test_*.py" = ["S101", "FBT", "PLR0913", "PLR0917"]
+"**/conftest.py" = ["S101", "FBT", "PLR0913", "PLR0917"]
+"**/__main__.py" = ["T20"]
+"**/scripts/**" = ["T20"]
+# "src/your_package/cli.py" = ["T20"]  # replace with the project's CLI module
 
 [tool.ruff.lint.pylint]
 max-args = 5
 max-positional-args = 5
+max-bool-expr = 5
+max-nested-blocks = 5
 
-[tool.ruff.lint.mccabe]
-max-complexity = 10
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"your_package.legacy_helpers".msg = "use your_package.shared instead"  # replace with real entries
 ```
+
+Complexity: measure the repository's cyclomatic complexity first, then add `"C90"` and set
+`[tool.ruff.lint.mccabe] max-complexity` to its measured tail.
 
 ## References
 
