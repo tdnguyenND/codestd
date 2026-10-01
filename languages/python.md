@@ -178,8 +178,9 @@ ban-relative-imports = "all"
 
 - Nesting and boolean operands are enforced by pylint R1702 and R0916, both on by default. ruff has
   them only in preview; do not turn preview on for them. Without pylint they are review signals.
-- pylint R1702 counts only `if`, `for`, `while` and `try`, and restarts the count at a `with`.
-  Count `with` blocks toward the nesting limit in review.
+- pylint R1702 counts only `if`, `for`, `while` and `try`; any other block (`with`, `match`/`case`)
+  restarts the count. Count those blocks toward the nesting limit in review, with a `match` counting
+  as one level (core 3.2).
 - In a project without pytest, add `"PT009", "PT027"` to `[tool.ruff.lint] ignore`.
 - Complexity: measure the repository's cyclomatic complexity first, then add `"C90"` and set
   `[tool.ruff.lint.mccabe] max-complexity` to its measured tail.
